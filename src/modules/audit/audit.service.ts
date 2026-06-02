@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AuditSeverity, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 type AuditInput = {
@@ -8,6 +8,11 @@ type AuditInput = {
   entityType: string;
   entityId?: string;
   metadata?: Prisma.InputJsonValue;
+  ipAddress?: string;
+  userAgent?: string;
+  organizationId?: string;
+  applicationId?: string;
+  severity?: AuditSeverity;
 };
 
 @Injectable()
@@ -22,6 +27,11 @@ export class AuditService {
         entityType: input.entityType,
         entityId: input.entityId,
         metadata: input.metadata,
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+        organizationId: input.organizationId,
+        applicationId: input.applicationId,
+        severity: input.severity,
       },
     });
   }

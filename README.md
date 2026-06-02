@@ -20,8 +20,15 @@ Obsidian Core is the shared backend platform for the Obsidian Systems ecosystem.
 - `roles`: platform roles
 - `permissions`: platform permissions
 - `applications`: Obsidian ecosystem application registry
+- `application-permissions`: application-scoped permission registry
+- `organizations`: multi-tenant organization records and membership foundation
+- `teams`: organization-bound teams and membership foundation
+- `sessions`: device session history and refresh-token revocation
 - `notifications`: user notifications and preferences
 - `audit`: audit event writer for platform activity
+- `feature-flags`: platform feature flag administration
+- `system-settings`: platform setting administration
+- `announcements`: platform announcement administration
 - `health`: service and database health endpoint
 
 ## Local Setup
@@ -86,6 +93,26 @@ Core auth endpoints:
 - `POST /auth/login`
 - `POST /auth/refresh`
 - `GET /auth/me`
+
+v0.2 platform endpoints:
+
+- `GET /organizations`
+- `POST /organizations`
+- `GET /organizations/:id`
+- `PATCH /organizations/:id`
+- `GET /teams`
+- `POST /teams`
+- `GET /teams/:id`
+- `GET /sessions`
+- `DELETE /sessions/:id`
+- `GET /application-permissions`
+- `POST /application-permissions`
+- `GET /feature-flags`
+- `POST /feature-flags`
+- `GET /system-settings`
+- `PATCH /system-settings/:id`
+- `GET /announcements`
+- `POST /announcements`
 
 ## Authorization
 

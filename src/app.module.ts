@@ -16,6 +16,13 @@ import { ApplicationsModule } from './modules/applications/applications.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { TeamsModule } from './modules/teams/teams.module';
+import { SessionsModule } from './modules/sessions/sessions.module';
+import { ApplicationPermissionsModule } from './modules/application-permissions/application-permissions.module';
+import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
+import { SystemSettingsModule } from './modules/system-settings/system-settings.module';
+import { AnnouncementsModule } from './modules/announcements/announcements.module';
 
 @Module({
   imports: [
@@ -33,6 +40,13 @@ import { HealthModule } from './modules/health/health.module';
     NotificationsModule,
     AuditModule,
     HealthModule,
+    OrganizationsModule,
+    TeamsModule,
+    SessionsModule,
+    ApplicationPermissionsModule,
+    FeatureFlagsModule,
+    SystemSettingsModule,
+    AnnouncementsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

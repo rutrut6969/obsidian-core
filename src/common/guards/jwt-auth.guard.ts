@@ -42,6 +42,13 @@ export class JwtAuthGuard implements CanActivate {
               role: {
                 include: {
                   permissions: { include: { permission: true } },
+                  applicationPermissions: {
+                    include: {
+                      applicationPermission: {
+                        include: { application: true },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -61,7 +68,12 @@ export class JwtAuthGuard implements CanActivate {
         permissions: [
           ...new Set(
             user.roles.flatMap((userRole) =>
-              userRole.role.permissions.map((rolePermission) => rolePermission.permission.name),
+              [
+                ...userRole.role.permissions.map((rolePermission) => rolePermission.permission.name),
+                ...userRole.role.applicationPermissions.map(
+                  (rolePermission) => rolePermission.applicationPermission.permissionName,
+                ),
+              ],
             ),
           ),
         ],

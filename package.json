@@ -1,6 +1,6 @@
 {
   "name": "obsidian-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Production-oriented backend platform for the Obsidian Systems ecosystem.",
   "private": true,
   "license": "UNLICENSED",

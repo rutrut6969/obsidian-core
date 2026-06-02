@@ -23,6 +23,9 @@ model User {
   notificationPreference  NotificationPreference?
   auditLogs               AuditLog[]
   refreshTokens           RefreshToken[]
+  organizations           OrganizationMember[]
+  teams                   TeamMember[]
+  deviceSessions          DeviceSession[]
 
   @@map("users")
 }
@@ -34,6 +37,7 @@ model Role {
   createdAt   DateTime         @default(now())
   users       UserRole[]
   permissions RolePermission[]
+  applicationPermissions RoleApplicationPermission[]
 
   @@map("roles")
 }
@@ -79,6 +83,8 @@ model Application {
   isActive    Boolean           @default(true)
   createdAt   DateTime          @default(now())
   users       ApplicationUser[]
+  permissions ApplicationPermission[]
+  auditLogs   AuditLog[]
 
   @@map("applications")
 }
@@ -120,14 +126,21 @@ model NotificationPreference {
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String?
-  action     String
-  entityType String
-  entityId   String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id             String        @id @default(uuid())
+  userId         String?
+  action         String
+  entityType     String
+  entityId       String?
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  organizationId String?
+  applicationId  String?
+  severity       AuditSeverity @default(INFO)
+  createdAt      DateTime      @default(now())
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  application    Application?  @relation(fields: [applicationId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
 }
@@ -140,9 +153,136 @@ model RefreshToken {
   revokedAt DateTime?
   createdAt DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession DeviceSession?
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model Organization {
+  id          String               @id @default(uuid())
+  name        String
+  slug        String               @unique
+  description String?
+  logoUrl     String?
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  members     OrganizationMember[]
+  teams       Team[]
+  auditLogs   AuditLog[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String                 @id @default(uuid())
+  organizationId String
+  userId         String
+  role           OrganizationMemberRole @default(MEMBER)
+  joinedAt       DateTime               @default(now())
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@map("organization_members")
+}
+
+model Team {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members        TeamMember[]
+
+  @@unique([organizationId, name])
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String   @id @default(uuid())
+  teamId   String
+  userId   String
+  joinedAt DateTime @default(now())
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model DeviceSession {
+  id             String       @id @default(uuid())
+  userId         String
+  deviceName     String?
+  deviceType     String?
+  platform       String?
+  ipAddress      String?
+  userAgent      String?
+  lastSeenAt     DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  isTrusted      Boolean      @default(false)
+  isRevoked      Boolean      @default(false)
+  refreshTokenId String?      @unique
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken   RefreshToken? @relation(fields: [refreshTokenId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("device_sessions")
+}
+
+model ApplicationPermission {
+  id             String                      @id @default(uuid())
+  applicationId  String
+  permissionName String
+  description    String?
+  application    Application                 @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  roles          RoleApplicationPermission[]
+
+  @@unique([applicationId, permissionName])
+  @@map("application_permissions")
+}
+
+model RoleApplicationPermission {
+  id                      String                @id @default(uuid())
+  roleId                  String
+  applicationPermissionId String
+  role                    Role                  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  applicationPermission   ApplicationPermission @relation(fields: [applicationPermissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, applicationPermissionId])
+  @@map("role_application_permissions")
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@map("system_settings")
+}
+
+model FeatureFlag {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  description String?
+  enabled     Boolean @default(false)
+
+  @@map("feature_flags")
+}
+
+model PlatformAnnouncement {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("platform_announcements")
 }
 
 enum NotificationType {
@@ -150,4 +290,17 @@ enum NotificationType {
   SECURITY
   SYSTEM
   MARKETING
+}
+
+enum OrganizationMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum AuditSeverity {
+  INFO
+  WARNING
+  ERROR
+  SECURITY
 }

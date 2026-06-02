@@ -3,8 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
+import { AuditSeverity, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { DeviceSessionContext, SessionsService } from '../sessions/sessions.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -22,8 +23,12 @@ type IdentityUser = Prisma.UserGetPayload<{
     };
     applications: { include: { application: true } };
     notificationPreference: true;
+    organizations: { include: { organization: true } };
+    teams: { include: { team: true } };
   };
 }>;
+
+type RequestContext = DeviceSessionContext;
 
 @Injectable()
 export class IdentityService {
@@ -32,9 +37,10 @@ export class IdentityService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly sessionsService: SessionsService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, context: RequestContext = {}) {
     const existing = await this.prisma.user.findFirst({
       where: { OR: [{ email: dto.email.toLowerCase() }, { username: dto.username }] },
     });
@@ -67,13 +73,17 @@ export class IdentityService {
       action: 'identity.register',
       entityType: 'User',
       entityId: user.id,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+      severity: AuditSeverity.SECURITY,
     });
 
     const tokens = await this.issueTokens(user.id, user.email);
-    return { user: this.toSafeUser(user), ...tokens };
+    await this.sessionsService.createForLogin(user.id, tokens.refreshTokenId, context);
+    return this.authResponse(user, tokens);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, context: RequestContext = {}) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
       include: this.userInclude(),
@@ -92,20 +102,39 @@ export class IdentityService {
       action: 'identity.login',
       entityType: 'User',
       entityId: user.id,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+      severity: AuditSeverity.SECURITY,
     });
 
+    const sessionContext = {
+      ...context,
+      deviceName: dto.deviceName,
+      deviceType: dto.deviceType,
+      platform: dto.platform,
+    };
     const tokens = await this.issueTokens(user.id, user.email);
-    return { user: this.toSafeUser(user), ...tokens };
+    await this.sessionsService.createForLogin(user.id, tokens.refreshTokenId, sessionContext);
+    return this.authResponse(user, tokens);
   }
 
-  async refresh(refreshToken: string) {
+  async refresh(refreshToken: string, context: RequestContext = {}) {
     const payload = await this.verifyRefreshToken(refreshToken);
     const tokenRecord = await this.prisma.refreshToken.findUnique({
       where: { id: payload.jti },
       include: { user: { include: this.userInclude() } },
     });
 
-    if (!tokenRecord || tokenRecord.revokedAt || tokenRecord.expiresAt < new Date()) {
+    const session = await this.prisma.deviceSession.findUnique({
+      where: { refreshTokenId: payload.jti },
+    });
+
+    if (
+      !tokenRecord ||
+      tokenRecord.revokedAt ||
+      tokenRecord.expiresAt < new Date() ||
+      session?.isRevoked
+    ) {
       throw new UnauthorizedException('Refresh token is no longer valid.');
     }
 
@@ -120,7 +149,23 @@ export class IdentityService {
     });
 
     const tokens = await this.issueTokens(tokenRecord.user.id, tokenRecord.user.email);
-    return { user: this.toSafeUser(tokenRecord.user), ...tokens };
+    if (session) {
+      await this.sessionsService.rotateRefreshToken(session.id, tokens.refreshTokenId, context);
+    } else {
+      await this.sessionsService.createForLogin(tokenRecord.user.id, tokens.refreshTokenId, context);
+    }
+
+    await this.auditService.record({
+      userId: tokenRecord.user.id,
+      action: 'identity.refresh',
+      entityType: 'RefreshToken',
+      entityId: tokens.refreshTokenId,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+      severity: AuditSeverity.SECURITY,
+    });
+
+    return this.authResponse(tokenRecord.user, tokens);
   }
 
   async me(userId: string) {
@@ -158,7 +203,7 @@ export class IdentityService {
       },
     });
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, refreshTokenId };
   }
 
   private async verifyRefreshToken(refreshToken: string) {
@@ -192,7 +237,20 @@ export class IdentityService {
       },
       applications: { include: { application: true } },
       notificationPreference: true,
+      organizations: { include: { organization: true } },
+      teams: { include: { team: true } },
     } as const;
+  }
+
+  private authResponse(
+    user: IdentityUser,
+    tokens: { accessToken: string; refreshToken: string; refreshTokenId: string },
+  ) {
+    return {
+      user: this.toSafeUser(user),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   private toSafeUser(user: IdentityUser) {
@@ -208,6 +266,8 @@ export class IdentityService {
       roles: user.roles,
       applications: user.applications,
       notificationPreference: user.notificationPreference,
+      organizations: user.organizations,
+      teams: user.teams,
     };
   }
 }
