@@ -171,11 +171,13 @@ Run migrations before starting production traffic:
 npm run prisma:deploy
 ```
 
-In `render.yaml`, this is configured as:
+Render free-tier web services do not support `preDeployCommand`. On a paid service, you can configure:
 
 ```yaml
 preDeployCommand: npm run prisma:deploy
 ```
+
+On the free tier, run migrations manually from a Render shell or upgrade the service before enabling a pre-deploy migration command.
 
 ### Render Deployment Flow
 
@@ -188,7 +190,7 @@ preDeployCommand: npm run prisma:deploy
    - `JWT_ACCESS_EXPIRES_IN`
    - `JWT_REFRESH_EXPIRES_IN`
    - `CORS_ORIGINS`
-4. Deploy. Render runs Prisma migrations as the pre-deploy command, then starts the API with `node dist/main.js`.
+4. Deploy. The Docker image starts the API with `node dist/main.js`. Run Prisma migrations separately on the free tier.
 
 ## Production Notes
 

@@ -2,8 +2,7 @@ services:
   - type: web
     name: obsidian-core
     runtime: docker
-    plan: starter
-    preDeployCommand: npm run prisma:deploy
+    plan: free
     envVars:
       - key: NODE_ENV
         value: production
@@ -25,4 +24,4 @@ services:
         value: ""
 databases:
   - name: obsidian-core-db
-    plan: starter
+    plan: free
