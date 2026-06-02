@@ -3,6 +3,7 @@ services:
     name: obsidian-core
     runtime: docker
     plan: starter
+    preDeployCommand: npm run prisma:deploy
     envVars:
       - key: NODE_ENV
         value: production
@@ -20,6 +21,8 @@ services:
         value: 15m
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
+      - key: CORS_ORIGINS
+        value: ""
 databases:
   - name: obsidian-core-db
     plan: starter

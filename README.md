@@ -117,7 +117,67 @@ This repo includes:
 - `render.yaml`
 - `.env.example`
 
-Render deployment flow:
+### Required Environment Variables
+
+- `DATABASE_URL`: PostgreSQL connection string.
+- `JWT_ACCESS_SECRET`: long random secret for access tokens.
+- `JWT_REFRESH_SECRET`: long random secret for refresh tokens.
+- `JWT_ACCESS_EXPIRES_IN`: access-token lifetime, for example `15m`.
+- `JWT_REFRESH_EXPIRES_IN`: refresh-token lifetime, for example `7d`.
+- `CORS_ORIGINS`: comma-separated list of trusted origins. Leave empty only when no browser clients are deployed yet.
+- `PORT`: Render provides this automatically; the app falls back to `3000`.
+
+### Docker Deployment
+
+Render can deploy this project from the included `render.yaml` Blueprint or Dockerfile.
+
+Docker build flow:
+
+```bash
+npm ci
+npx prisma generate
+npm run build
+```
+
+Docker start command:
+
+```bash
+node dist/main.js
+```
+
+The Docker image copies the generated Prisma client, compiled `dist` folder, and `prisma` folder into the runtime stage. The compiled entrypoint is generated at `dist/main.js`.
+
+### Node Deployment
+
+If you deploy as a Render Node service instead of Docker, use:
+
+Build Command:
+
+```bash
+npm ci && npm run prisma:generate && npm run build
+```
+
+Start Command:
+
+```bash
+npm run start:prod
+```
+
+### Prisma Migrations
+
+Run migrations before starting production traffic:
+
+```bash
+npm run prisma:deploy
+```
+
+In `render.yaml`, this is configured as:
+
+```yaml
+preDeployCommand: npm run prisma:deploy
+```
+
+### Render Deployment Flow
 
 1. Create a new Blueprint from this repository, or create a Web Service using the included Dockerfile.
 2. Attach a Render PostgreSQL database.
@@ -128,7 +188,7 @@ Render deployment flow:
    - `JWT_ACCESS_EXPIRES_IN`
    - `JWT_REFRESH_EXPIRES_IN`
    - `CORS_ORIGINS`
-4. Deploy. The Docker start command runs `prisma migrate deploy` before starting the API.
+4. Deploy. Render runs Prisma migrations as the pre-deploy command, then starts the API with `node dist/main.js`.
 
 ## Production Notes
 
